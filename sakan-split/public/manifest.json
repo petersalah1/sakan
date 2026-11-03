@@ -1,0 +1,21 @@
+{
+  "name": "سَكَن سبليت - مصاريف الشقة",
+  "short_name": "سَكَن سبليت",
+  "description": "تطبيق تنظيم ومشاركة وتصفية مصاريف السكن والشقق المشتركة",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#059669",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
