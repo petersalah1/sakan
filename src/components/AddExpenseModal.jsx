@@ -17,6 +17,9 @@ export default function AddExpenseModal({ isOpen, onClose }) {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
+  const activePaidBy = paidBy || members[0]?.id || '';
+  const activeSplits = splits.length > 0 ? splits : members.map((m) => m.id);
+
   if (!isOpen) return null;
 
   const toggleSplitMember = (id) => {
@@ -41,11 +44,11 @@ export default function AddExpenseModal({ isOpen, onClose }) {
       setError('يرجى كتابة مبلغ صحيح أكبر من الصفر');
       return;
     }
-    if (!paidBy) {
+    if (!activePaidBy) {
       setError('يرجى تحديد من دفع المبلغ');
       return;
     }
-    if (splits.length === 0) {
+    if (activeSplits.length === 0) {
       setError('يرجى اختيار شخص واحد على الأقل للمشاركة في التقسيم');
       return;
     }
@@ -53,10 +56,10 @@ export default function AddExpenseModal({ isOpen, onClose }) {
     addExpense({
       title,
       amount: parsedAmount,
-      paid_by: paidBy,
+      paid_by: activePaidBy,
       category,
       expense_date: date,
-      splits,
+      splits: activeSplits,
       notes,
     });
 
@@ -65,7 +68,7 @@ export default function AddExpenseModal({ isOpen, onClose }) {
 
   const parsedAmount = parseFloat(amount) || 0;
   const perPersonShare =
-    splits.length > 0 ? (parsedAmount / splits.length).toFixed(2) : 0;
+    activeSplits.length > 0 ? (parsedAmount / activeSplits.length).toFixed(2) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -183,7 +186,7 @@ export default function AddExpenseModal({ isOpen, onClose }) {
                 مين دفع المبلغ؟ *
               </label>
               <select
-                value={paidBy}
+                value={activePaidBy}
                 onChange={(e) => setPaidBy(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
@@ -199,7 +202,7 @@ export default function AddExpenseModal({ isOpen, onClose }) {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  يتقسم على مين؟ ({splits.length} من {members.length})
+                  يتقسم على مين؟ ({activeSplits.length} من {members.length})
                 </label>
                 <div className="flex items-center gap-2 text-[11px] font-bold">
                   <button
@@ -222,7 +225,7 @@ export default function AddExpenseModal({ isOpen, onClose }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {members.map((m) => {
-                  const isSelected = splits.includes(m.id);
+                  const isSelected = activeSplits.includes(m.id);
                   return (
                     <div
                       key={m.id}

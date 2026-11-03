@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedMember, setSelectedMember] = useState(members[0]?.name || 'أحمد محمود');
+  const [selectedMember, setSelectedMember] = useState(members[0]?.name || 'بيتر صلاح');
   const [error, setError] = useState('');
 
   const handleEmailLogin = async (e) => {

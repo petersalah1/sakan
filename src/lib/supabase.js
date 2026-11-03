@@ -4,10 +4,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  'placeholder-key';
+  'placeholder-anon-key';
 
 export const isSupabaseConfigured = () => {
   return (
+    typeof process !== 'undefined' &&
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||

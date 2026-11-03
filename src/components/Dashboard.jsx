@@ -2,133 +2,151 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useApp } from '@/context/AppContext';
-import AddExpense from './AddExpense';
+import { useApartment } from '@/hooks/useApartment';
+import { formatCurrency } from '@/utils/currency';
+import { getCategoryById } from '@/utils/categories';
+import StatCard from './StatCard';
+import AddExpenseModal from './AddExpenseModal';
+import SettleModal from './SettleModal';
 
 export default function Dashboard() {
   const {
-    expenses,
+    apartment,
     members,
+    expenses,
     totalExpenses,
     suggestedSettlements,
     memberStats,
-    resetData,
-  } = useApp();
+  } = useApartment();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeSettlement, setActiveSettlement] = useState(null);
 
-  // Recent 4 expenses
-  const recentExpenses = expenses.slice(0, 4);
-
-  // Average per member
-  const averagePerMember =
+  const recentExpenses = expenses.slice(0, 5);
+  const averageShare =
     members.length > 0 ? (totalExpenses / members.length).toFixed(1) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Welcome / Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-l from-emerald-600 to-teal-700 text-white rounded-3xl p-6 sm:p-8 shadow-sm">
-        <div>
-          <span className="text-xs uppercase tracking-wider font-semibold bg-white/20 px-3 py-1 rounded-full mb-3 inline-block">
-            نظام إدارة مصاريف السكن
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            أهلاً بك في سَكَن 🏠
-          </h1>
-          <p className="text-sm text-emerald-100 mt-2 max-w-xl leading-relaxed">
-            تتبع مصاريف الشقة المشتركة، قسم الفواتير بين الساكنين، وصفّي الحسابات بضغطة زر وبدون إحراج.
-          </p>
-        </div>
+      {/* Hero Welcome Card */}
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 rounded-3xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <span className="text-xs uppercase tracking-wider font-extrabold bg-white/20 px-3 py-1 rounded-full mb-3 inline-block">
+              نظام إدارة مصاريف الشقة الذكي
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
+              أهلاً بك في {apartment.name} 🏠
+            </h1>
+            <p className="text-sm text-emerald-100 mt-2 leading-relaxed">
+              سجل كل فواتير ومصاريف السكن المشتركة، واعرف فوراً مين عليه فلوس ومين له فلوس بدون إحراج أو حسابات معقدة.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-5 py-3 bg-white text-emerald-800 hover:bg-emerald-50 active:bg-emerald-100 font-black rounded-2xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
+            >
+              <span className="text-lg">+</span>
+              <span>تسجيل مصروف جديد</span>
+            </button>
+
+            <Link
+              href="/settlements"
+              className="px-4 py-3 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold rounded-2xl text-xs sm:text-sm backdrop-blur-xs transition-all flex items-center gap-1.5"
+            >
+              <span>🤝</span>
+              <span>تصفية الحسابات</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="إجمالي المصاريف"
+          value={formatCurrency(totalExpenses, apartment.currency)}
+          subtitle="المجموع الكلي للمصاريف المشتركة"
+          icon="💰"
+          color="emerald"
+        />
+
+        <StatCard
+          title="أفراد الشقة"
+          value={`${members.length} ساكنين`}
+          subtitle="الأعضاء المسجلين في السكن"
+          icon="👥"
+          color="blue"
+        />
+
+        <StatCard
+          title="متوسط نصيب الفرد"
+          value={formatCurrency(averageShare, apartment.currency)}
+          subtitle="إذا تم التقسيم بالتساوي"
+          icon="⚖️"
+          color="purple"
+        />
+
+        <StatCard
+          title="تسويات معلقة"
+          value={`${suggestedSettlements.length} تحويلات`}
+          subtitle={
+            suggestedSettlements.length > 0
+              ? 'مطلوب إتمامها للتصفية'
+              : 'الحسابات متوازنة تماماً'
+          }
+          icon="🤝"
+          color="amber"
+        />
+      </div>
+
+      {/* Suggested Settlement Quick Notice */}
+      {suggestedSettlements.length > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">💡</span>
+            <div>
+              <h4 className="text-xs font-black text-amber-900 dark:text-amber-200">
+                تسوية مطلوبة ذات أولوية:
+              </h4>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                <strong className="font-extrabold">{suggestedSettlements[0].from.name}</strong>{' '}
+                يدفع{' '}
+                <strong className="text-emerald-700 dark:text-emerald-400 font-black">
+                  {formatCurrency(suggestedSettlements[0].amount, apartment.currency)}
+                </strong>{' '}
+                لـ <strong className="font-extrabold">{suggestedSettlements[0].to.name}</strong>
+              </p>
+            </div>
+          </div>
+
           <button
-            onClick={() => setShowAddModal(true)}
-            className="px-5 py-3 bg-white text-emerald-800 hover:bg-emerald-50 active:bg-emerald-100 font-bold rounded-2xl text-sm shadow-md transition-all flex items-center gap-2"
+            onClick={() => setActiveSettlement(suggestedSettlements[0])}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all self-start sm:self-auto"
           >
-            <span>+</span>
-            <span>إضافة مصروف جديد</span>
+            سداد وتسوية الآن
           </button>
         </div>
-      </div>
+      )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Expenses */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl font-bold">
-            💰
-          </div>
-          <div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 block font-medium">
-              إجمالي المصاريف
-            </span>
-            <span suppressHydrationWarning className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
-              {totalExpenses.toLocaleString()} ج.م
-            </span>
-          </div>
-        </div>
-
-        {/* Members Count */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400 text-2xl font-bold">
-            👥
-          </div>
-          <div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 block font-medium">
-              أفراد السكن
-            </span>
-            <span suppressHydrationWarning className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
-              {members.length} ساكنين
-            </span>
-          </div>
-        </div>
-
-        {/* Average per member */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400 text-2xl font-bold">
-            ⚖️
-          </div>
-          <div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 block font-medium">
-              متوسط نصيب الفرد
-            </span>
-            <span suppressHydrationWarning className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
-              {Number(averagePerMember).toLocaleString()} ج.م
-            </span>
-          </div>
-        </div>
-
-        {/* Suggested settlements count */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 text-2xl font-bold">
-            🤝
-          </div>
-          <div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 block font-medium">
-              تسويات معلقة
-            </span>
-            <span suppressHydrationWarning className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
-              {suggestedSettlements.length} تحويلات
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
+      {/* Main Two-Column View */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Recent Expenses */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <h2 className="text-base font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <span>🧾</span>
                 <span>آخر المصاريف المسجلة</span>
               </h2>
+
               <Link
                 href="/expenses"
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
               >
-                عرض كل المصاريف ←
+                عرض كل المصاريف ({expenses.length}) ←
               </Link>
             </div>
 
@@ -139,38 +157,34 @@ export default function Dashboard() {
             ) : (
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {recentExpenses.map((exp) => {
-                  const payer = members.find((m) => m.id === exp.paidBy);
+                  const cat = getCategoryById(exp.category);
+                  const payer = members.find((m) => m.id === exp.paid_by);
+
                   return (
                     <div
                       key={exp.id}
-                      className="py-3 flex items-center justify-between"
+                      className="py-3 flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-base font-bold">
-                          {exp.category === 'فواتير'
-                            ? '⚡'
-                            : exp.category === 'طعام'
-                            ? '🍔'
-                            : exp.category === 'إنترنت'
-                            ? '🌐'
-                            : '🛒'}
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg shrink-0">
+                          {cat.icon}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                             {exp.title}
                           </p>
                           <p className="text-xs text-zinc-400">
-                            دفعها {payer ? payer.name : 'غير محدد'} • {exp.date}
+                            دفعها {payer ? payer.name : 'غير مسجل'} • {exp.expense_date}
                           </p>
                         </div>
                       </div>
 
                       <div className="text-left sm:text-right">
-                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 block">
-                          {exp.amount.toLocaleString()} ج.م
+                        <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 block">
+                          {formatCurrency(exp.amount, apartment.currency)}
                         </span>
                         <span className="text-[10px] text-zinc-400">
-                          مقسم على {exp.splitBetween?.length || 0}
+                          مقسم على {exp.splits?.length || 0}
                         </span>
                       </div>
                     </div>
@@ -179,99 +193,57 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
-          {/* Quick action cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link
-              href="/expenses"
-              className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-emerald-500 transition-all text-center block group"
-            >
-              <span className="text-2xl block mb-1">💸</span>
-              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 block">
-                سجل المصاريف
-              </span>
-              <span className="text-[11px] text-zinc-400">
-                إدارة وفلترة كل المصاريف
-              </span>
-            </Link>
-
-            <Link
-              href="/settlements"
-              className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-emerald-500 transition-all text-center block group"
-            >
-              <span className="text-2xl block mb-1">🤝</span>
-              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 block">
-                تصفية الحسابات
-              </span>
-              <span className="text-[11px] text-zinc-400">
-                تسوية الديون المقترحة
-              </span>
-            </Link>
-
-            <Link
-              href="/members"
-              className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-emerald-500 transition-all text-center block group"
-            >
-              <span className="text-2xl block mb-1">👥</span>
-              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 block">
-                أعضاء السكن
-              </span>
-              <span className="text-[11px] text-zinc-400">
-                إضافة وإدارة الساكنين
-              </span>
-            </Link>
-          </div>
         </div>
 
         {/* Right 1 Col: Roommates Balance Snapshot */}
         <div className="space-y-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <span>⚖️</span>
+              <h2 className="text-base font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span>👥</span>
                 <span>أرصدة الساكنين</span>
               </h2>
+
               <Link
-                href="/settlements"
-                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+                href="/members"
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
               >
-                التفاصيل
+                إدارة الأعضاء
               </Link>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {members.map((m) => {
                 const stats = memberStats[m.id] || { net: 0 };
-                const net = Math.round(stats.net * 100) / 100;
                 return (
                   <div
                     key={m.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 text-xs"
+                    className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 text-xs"
                   >
                     <div className="flex items-center gap-2">
                       <span
                         className={`w-2.5 h-2.5 rounded-full ${
-                          m.color || 'bg-zinc-400'
+                          m.avatar_color || 'bg-zinc-400'
                         }`}
                       />
-                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200">
                         {m.name}
                       </span>
                     </div>
 
                     <div>
-                      {net > 0.01 && (
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          له {net} ج.م
+                      {stats.net > 0.01 && (
+                        <span className="font-black text-emerald-600 dark:text-emerald-400">
+                          له {formatCurrency(stats.net, apartment.currency)}
                         </span>
                       )}
-                      {net < -0.01 && (
-                        <span className="font-bold text-rose-600 dark:text-rose-400">
-                          عليه {Math.abs(net)} ج.م
+                      {stats.net < -0.01 && (
+                        <span className="font-black text-rose-600 dark:text-rose-400">
+                          عليه {formatCurrency(Math.abs(stats.net), apartment.currency)}
                         </span>
                       )}
-                      {Math.abs(net) <= 0.01 && (
-                        <span className="text-zinc-400">خالص</span>
+                      {Math.abs(stats.net) <= 0.01 && (
+                        <span className="text-zinc-400 font-bold">خالص</span>
                       )}
                     </div>
                   </div>
@@ -279,56 +251,23 @@ export default function Dashboard() {
               })}
             </div>
           </div>
-
-          {/* Suggested Settlements Preview */}
-          {suggestedSettlements.length > 0 && (
-            <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1.5">
-                <span>💡</span>
-                <span>تسوية سريعة مطلوبة:</span>
-              </h3>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                <span className="font-semibold">{suggestedSettlements[0].from.name}</span> يدفع{' '}
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                  {suggestedSettlements[0].amount} ج.م
-                </span>{' '}
-                لـ <span className="font-semibold">{suggestedSettlements[0].to.name}</span>
-              </p>
-              <Link
-                href="/settlements"
-                className="mt-3 block text-center text-xs font-semibold py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm"
-              >
-                عرض كل التسويات
-              </Link>
-            </div>
-          )}
-
-          {/* Reset sample data helper button */}
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                if (confirm('هل تريد استعادة البيانات الافتراضية التجريبية؟')) {
-                  resetData();
-                }
-              }}
-              className="w-full text-center text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1"
-            >
-              🔄 استعادة البيانات التجريبية
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Modals */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="max-w-xl w-full max-h-[90vh] overflow-y-auto">
-            <AddExpense
-              onSuccess={() => setShowAddModal(false)}
-              onCancel={() => setShowAddModal(false)}
-            />
-          </div>
-        </div>
+        <AddExpenseModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {activeSettlement && (
+        <SettleModal
+          settlement={activeSettlement}
+          isOpen={Boolean(activeSettlement)}
+          onClose={() => setActiveSettlement(null)}
+        />
       )}
     </div>
   );

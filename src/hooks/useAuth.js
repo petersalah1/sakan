@@ -9,9 +9,9 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     return getStoredItem('user', {
-      id: 'm-1',
-      name: 'أحمد محمود',
-      email: 'ahmed@sakansplit.local',
+      id: '7585eb0f-839d-4a68-93ce-c114bbb1001a',
+      name: 'بيتر صلاح',
+      email: 'petersalah104@gmail.com',
       isDemo: true,
     });
   });
@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
           setUser({
             id: session.user.id,
             email: session.user.email,
-            name: session.user.user_metadata?.name || session.user.email.split('@')[0],
+            name: session.user.user_metadata?.name || 'بيتر صلاح',
             isDemo: false,
           });
         }
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
           setUser({
             id: session.user.id,
             email: session.user.email,
-            name: session.user.user_metadata?.name || session.user.email.split('@')[0],
+            name: session.user.user_metadata?.name || 'بيتر صلاح',
             isDemo: false,
           });
         }
@@ -60,15 +60,14 @@ export function AuthProvider({ children }) {
         setUser({
           id: data.user.id,
           email: data.user.email,
-          name: data.user.user_metadata?.name || email.split('@')[0],
+          name: data.user.user_metadata?.name || 'بيتر صلاح',
           isDemo: false,
         });
         return { success: true };
       } else {
-        // Local mode login
         const demoUser = {
-          id: 'u-' + Date.now(),
-          name: email.split('@')[0],
+          id: 'u-peter',
+          name: 'بيتر صلاح',
           email,
           isDemo: true,
         };
@@ -83,11 +82,11 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const loginAsDemo = (memberName = 'أحمد محمود') => {
+  const loginAsDemo = (memberName = 'بيتر صلاح') => {
     const demoUser = {
-      id: 'm-1',
+      id: '7585eb0f-839d-4a68-93ce-c114bbb1001a',
       name: memberName,
-      email: 'demo@sakansplit.local',
+      email: 'petersalah104@gmail.com',
       isDemo: true,
     };
     setUser(demoUser);
@@ -125,4 +124,3 @@ export function useAuth() {
   }
   return context;
 }
-
