@@ -7,17 +7,26 @@ import { formatCurrency } from '@/utils/currency';
 export default function SettleModal({ settlement, isOpen, onClose }) {
   const { recordSettlement, apartment } = useApartment();
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !settlement) return null;
 
-  const handleConfirm = () => {
-    recordSettlement({
-      fromMemberId: settlement.from.id,
-      toMemberId: settlement.to.id,
-      amount: settlement.amount,
-      notes: notes || `تسوية نقدية مباشرة: ${settlement.from.name} لـ ${settlement.to.name}`,
-    });
-    onClose();
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await recordSettlement({
+        fromMemberId: settlement.from.id,
+        toMemberId: settlement.to.id,
+        amount: settlement.amount,
+        notes: notes || `تسوية نقدية مباشرة: ${settlement.from.name} لـ ${settlement.to.name}`,
+      });
+      onClose();
+    } catch (e) {
+      console.error('Settlement error:', e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -77,13 +86,22 @@ export default function SettleModal({ settlement, isOpen, onClose }) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleConfirm}
-            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition-all"
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
           >
-            تأكيد التسوية وسداد المبلغ
+            {isSubmitting ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>جاري حفظ التسوية...</span>
+              </>
+            ) : (
+              <span>تأكيد التسوية وسداد المبلغ</span>
+            )}
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-xs font-bold"
+            disabled={isSubmitting}
+            className="px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-xs font-bold disabled:opacity-50"
           >
             إلغاء
           </button>

@@ -3,7 +3,7 @@
  * Computes exact member balances and minimal transaction paths
  */
 
-export function calculateBalancesAndSettlements(members = [], expenses = []) {
+export function calculateBalancesAndSettlements(members = [], expenses = [], settlements = []) {
   // Initialize balance dictionary
   const stats = {};
   members.forEach((m) => {
@@ -11,12 +11,15 @@ export function calculateBalancesAndSettlements(members = [], expenses = []) {
       member: m,
       paid: 0,
       share: 0,
+      settledPaid: 0,
+      settledReceived: 0,
       net: 0,
     };
   });
 
   let totalExpenses = 0;
 
+  // 1. Process expenses
   expenses.forEach((expense) => {
     const amount = Number(expense.amount) || 0;
     if (amount <= 0) return;
@@ -27,8 +30,9 @@ export function calculateBalancesAndSettlements(members = [], expenses = []) {
     }
 
     // Credit payer
-    if (stats[expense.paid_by || expense.paidBy]) {
-      stats[expense.paid_by || expense.paidBy].paid += amount;
+    const payerId = expense.paid_by || expense.paidBy;
+    if (stats[payerId]) {
+      stats[payerId].paid += amount;
     }
 
     // Debit split recipients
@@ -44,14 +48,44 @@ export function calculateBalancesAndSettlements(members = [], expenses = []) {
     }
   });
 
-  // Calculate net balance for each member: (paid - share)
+  // Calculate net balance from expenses: (paid - share)
   // Positive = member should receive money (له)
   // Negative = member owes money (عليه)
   Object.values(stats).forEach((item) => {
-    item.net = Math.round((item.paid - item.share) * 100) / 100;
+    item.net = item.paid - item.share;
   });
 
-  // Split into debtors and creditors
+  // 2. Process recorded settlements
+  // When member A (debtor) pays to member B (creditor):
+  // Member A has paid off that amount -> their net increases by +amount
+  // Member B has received that amount -> their net decreases by -amount
+  settlements.forEach((s) => {
+    const amt = Number(s.amount) || 0;
+    if (amt <= 0) return;
+
+    const fromId = s.from_member_id || s.fromMemberId || s.fromId;
+    const toId = s.to_member_id || s.toMemberId || s.toId;
+
+    if (stats[fromId]) {
+      stats[fromId].net += amt;
+      stats[fromId].settledPaid = (stats[fromId].settledPaid || 0) + amt;
+    }
+    if (stats[toId]) {
+      stats[toId].net -= amt;
+      stats[toId].settledReceived = (stats[toId].settledReceived || 0) + amt;
+    }
+  });
+
+  // Round numbers
+  Object.values(stats).forEach((item) => {
+    item.net = Math.round(item.net * 100) / 100;
+    item.paid = Math.round(item.paid * 100) / 100;
+    item.share = Math.round(item.share * 100) / 100;
+    item.settledPaid = Math.round((item.settledPaid || 0) * 100) / 100;
+    item.settledReceived = Math.round((item.settledReceived || 0) * 100) / 100;
+  });
+
+  // 3. Split into debtors and creditors
   const debtors = [];
   const creditors = [];
 
@@ -109,4 +143,3 @@ export function calculateBalancesAndSettlements(members = [], expenses = []) {
     suggestedSettlements,
   };
 }
-

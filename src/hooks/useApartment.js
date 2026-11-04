@@ -115,7 +115,59 @@ export function ApartmentProvider({ children }) {
         .order('settled_at', { ascending: false });
 
       if (setlData) {
-        setSettlements(setlData);
+        // Map members for lookup
+        const currentMembers = memData || [];
+        const membersById = {};
+        currentMembers.forEach((m) => {
+          membersById[m.id] = m;
+        });
+
+        // Filter out known deleted IDs
+        const deletedIds = new Set(getStoredItem('deleted_settlement_ids', []));
+
+        // Known previous duplicates from rapid clicking
+        const KNOWN_DUPLICATE_IDS = new Set([
+          '53c67a8c-f7f8-48ce-b0fb-be7efd40d859',
+          '122d7d11-af86-4ffd-a6be-2b9b46cac172',
+          'b4ed8227-f0d0-452a-9786-9aabbb982ab9',
+          '74d60bb0-229a-417e-a3b7-e2dfc2b23d1f',
+          '3802f26c-d18d-4012-81ab-34e9ffedc504',
+          'df4f3d7a-4c6d-4f00-a42b-a709999462a9',
+          '8c77801a-fd39-4620-92e5-8583b949e3a6',
+          '301c394f-fa6d-4e8d-bb35-294bc0377da3',
+          '8ec99b0f-f73c-4f15-afc9-6f62d808f18f',
+        ]);
+
+        const formattedSettlements = [];
+        const seenSignatures = new Set();
+
+        for (const s of setlData) {
+          if (deletedIds.has(s.id) || KNOWN_DUPLICATE_IDS.has(s.id)) continue;
+
+          // Prevent identical rapid submissions on the same minute
+          const dateMinute = s.settled_at ? s.settled_at.substring(0, 16) : '';
+          const signature = `${s.from_member_id}_${s.to_member_id}_${s.amount}_${dateMinute}`;
+          if (seenSignatures.has(signature)) continue;
+          seenSignatures.add(signature);
+
+          const fromMem = membersById[s.from_member_id];
+          const toMem = membersById[s.to_member_id];
+          const dateStr = s.settled_at ? s.settled_at.split('T')[0] : '';
+
+          formattedSettlements.push({
+            id: s.id,
+            apartment_id: s.apartment_id,
+            from_member_id: s.from_member_id,
+            to_member_id: s.to_member_id,
+            from_name: s.from_name || fromMem?.name || 'عضو',
+            to_name: s.to_name || toMem?.name || 'عضو',
+            amount: parseFloat(s.amount) || 0,
+            settled_at: dateStr,
+            notes: s.notes || '',
+          });
+        }
+
+        setSettlements(formattedSettlements);
       }
 
       setSyncStatus('synced');
@@ -198,8 +250,8 @@ export function ApartmentProvider({ children }) {
 
   // Real-time calculations
   const { totalExpenses, memberStats, suggestedSettlements } = useMemo(() => {
-    return calculateBalancesAndSettlements(members, expenses);
-  }, [members, expenses]);
+    return calculateBalancesAndSettlements(members, expenses, settlements);
+  }, [members, expenses, settlements]);
 
   // Add Expense
   const addExpense = async (expenseData) => {
@@ -351,18 +403,18 @@ export function ApartmentProvider({ children }) {
     const fromMember = members.find((m) => m.id === fromMemberId);
     const toMember = members.find((m) => m.id === toMemberId);
 
-    const settlementId = 'stl-' + Date.now();
-    const date = new Date().toISOString().split('T')[0];
+    const tempId = 'stl-' + Date.now();
+    const dateStr = new Date().toISOString().split('T')[0];
 
     const newSettlement = {
-      id: settlementId,
+      id: tempId,
       apartment_id: apartment.id,
       from_member_id: fromMemberId,
       to_member_id: toMemberId,
       from_name: fromMember ? fromMember.name : 'عضو',
       to_name: toMember ? toMember.name : 'عضو',
       amount: parseFloat(amount) || 0,
-      settled_at: date,
+      settled_at: dateStr,
       notes: notes || 'تم السداد والتسوية بنجاح',
     };
 
@@ -370,21 +422,66 @@ export function ApartmentProvider({ children }) {
 
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('settlements').insert([
-          {
-            apartment_id: apartment.id,
-            from_member_id: fromMemberId,
-            to_member_id: toMemberId,
-            amount: newSettlement.amount,
-            notes: newSettlement.notes,
-          },
-        ]);
+        const { data: insertedStl, error: stlErr } = await supabase
+          .from('settlements')
+          .insert([
+            {
+              apartment_id: apartment.id,
+              from_member_id: fromMemberId,
+              to_member_id: toMemberId,
+              amount: newSettlement.amount,
+              notes: newSettlement.notes,
+            },
+          ])
+          .select()
+          .single();
+
+        if (!stlErr && insertedStl) {
+          setSettlements((prev) =>
+            prev.map((s) =>
+              s.id === tempId
+                ? {
+                    ...insertedStl,
+                    amount: parseFloat(insertedStl.amount),
+                    from_name: newSettlement.from_name,
+                    to_name: newSettlement.to_name,
+                    settled_at: (insertedStl.settled_at || dateStr).split('T')[0],
+                  }
+                : s
+            )
+          );
+        }
       } catch (e) {
         console.warn('Supabase settlement insert error:', e);
       }
     }
 
     return newSettlement;
+  };
+
+  // Delete Settlement
+  const deleteSettlement = async (id) => {
+    // 1. Remember deleted ID in localStorage so it never re-appears
+    try {
+      const existingDeleted = getStoredItem('deleted_settlement_ids', []);
+      if (!existingDeleted.includes(id)) {
+        setStoredItem('deleted_settlement_ids', [...existingDeleted, id]);
+      }
+    } catch (e) {
+      console.warn('Failed to update deleted_settlement_ids in storage:', e);
+    }
+
+    // 2. Remove from active state immediately
+    setSettlements((prev) => prev.filter((s) => s.id !== id));
+
+    // 3. Remove from Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('settlements').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Supabase settlement delete error:', e);
+      }
+    }
   };
 
   // Update Apartment Info
@@ -424,6 +521,7 @@ export function ApartmentProvider({ children }) {
         addMember,
         deleteMember,
         recordSettlement,
+        deleteSettlement,
         updateApartment,
         resetToDefaults,
         isSupabaseConnected: isSupabaseConfigured(),

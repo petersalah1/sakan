@@ -12,10 +12,25 @@ export default function BalanceSummary() {
     memberStats,
     suggestedSettlements,
     settlements,
+    deleteSettlement,
     apartment,
   } = useApartment();
 
   const [activeSettlement, setActiveSettlement] = useState(null);
+
+  const membersMap = React.useMemo(() => {
+    const map = {};
+    members.forEach((m) => {
+      map[m.id] = m;
+    });
+    return map;
+  }, [members]);
+
+  const handleDeleteSettlement = (id) => {
+    if (window.confirm('هل تريد حذف هذه التسوية من السجل وإعادة احتساب الدين؟')) {
+      deleteSettlement(id);
+    }
+  };
 
   const handleShareWhatsApp = () => {
     let text = `🏠 *كشف حساب مصاريف السكن (${apartment.name})*\n`;
@@ -196,8 +211,18 @@ export default function BalanceSummary() {
                       {member.name}
                     </h4>
                     <p className="text-xs text-zinc-400">
-                      دفع: {formatCurrency(stats.paid, apartment.currency)} • استهلك:{' '}
-                      {formatCurrency(stats.share, apartment.currency)}
+                      دفع: {formatCurrency(stats.paid, apartment.currency)}
+                      {stats.settledPaid > 0 && (
+                        <span className="text-emerald-500 font-bold">
+                          {' '}(+{formatCurrency(stats.settledPaid, apartment.currency)} تسوية)
+                        </span>
+                      )}
+                      {stats.settledReceived > 0 && (
+                        <span className="text-amber-500 font-bold">
+                          {' '}(استلم {formatCurrency(stats.settledReceived, apartment.currency)} تسوية)
+                        </span>
+                      )}
+                      {' • '}استهلك: {formatCurrency(stats.share, apartment.currency)}
                     </p>
                   </div>
                 </div>
@@ -232,30 +257,66 @@ export default function BalanceSummary() {
       {/* Completed Settlements Stream */}
       {settlements.length > 0 && (
         <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-          <h3 className="text-base font-black text-zinc-900 dark:text-zinc-100 mb-3 flex items-center gap-2">
-            <span>📜</span>
-            <span>سجل التسويات التي تمت بالفعل ({settlements.length})</span>
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <span>📜</span>
+              <span>سجل التسويات التي تمت بالفعل ({settlements.length})</span>
+            </h3>
+          </div>
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {settlements.map((s) => (
-              <div
-                key={s.id}
-                className="py-3 flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-500 font-extrabold">✓</span>
-                  <span>
-                    سدّد <strong className="font-extrabold">{s.from_name}</strong>{' '}
-                    مبلغ{' '}
-                    <strong className="text-emerald-600 dark:text-emerald-400 font-black">
-                      {formatCurrency(s.amount, apartment.currency)}
-                    </strong>{' '}
-                    إلى <strong className="font-extrabold">{s.to_name}</strong>
-                  </span>
+            {settlements.map((s) => {
+              const fromName = s.from_name || membersMap[s.from_member_id]?.name || 'عضو';
+              const toName = s.to_name || membersMap[s.to_member_id]?.name || 'عضو';
+              const dateText = s.settled_at ? s.settled_at.split('T')[0] : '';
+
+              return (
+                <div
+                  key={s.id}
+                  className="py-3 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-emerald-500 font-extrabold text-sm">✓</span>
+                    <span className="truncate">
+                      سدّد <strong className="font-extrabold text-zinc-900 dark:text-zinc-100">{fromName}</strong>{' '}
+                      مبلغ{' '}
+                      <strong className="text-emerald-600 dark:text-emerald-400 font-black">
+                        {formatCurrency(s.amount, apartment.currency)}
+                      </strong>{' '}
+                      إلى <strong className="font-extrabold text-zinc-900 dark:text-zinc-100">{toName}</strong>
+                      {s.notes && (
+                        <span className="text-[11px] text-zinc-400 block sm:inline sm:mr-1.5">
+                          ({s.notes})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-zinc-400 font-medium text-[11px] dir-ltr">{dateText}</span>
+                    <button
+                      onClick={() => handleDeleteSettlement(s.id)}
+                      title="حذف هذه التسوية"
+                      className="p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-500 transition-colors"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <span className="text-zinc-400 font-medium">{s.settled_at}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
