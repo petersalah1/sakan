@@ -100,13 +100,30 @@ export default function Navbar() {
               <span className="hidden sm:inline">إضافة مصروف</span>
             </button>
 
-            {user && (
+            {user ? (
               <Link
                 href="/login"
-                title={`الملف الشخصي: ${user.name}`}
-                className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-black flex items-center justify-center text-xs hover:scale-105 transition-all shadow-xs"
+                title={`الملف الشخصي: ${user.name} (اضغط لتبديل الحساب)`}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 transition-all text-xs font-bold"
               >
-                {user.name.charAt(0)}
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[11px] shadow-xs">
+                  {user.name.charAt(0)}
+                </span>
+                <span className="hidden sm:inline font-extrabold truncate max-w-[100px]">
+                  {user.name}
+                </span>
+                {user.role === 'admin' && (
+                  <span className="text-[10px] hidden md:inline bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 rounded-md">
+                    مشرف
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-black transition-all"
+              >
+                تسجيل الدخول
               </Link>
             )}
           </div>

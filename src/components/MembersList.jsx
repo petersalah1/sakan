@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth, normalizePhone } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
 
 export default function MembersList() {
-  const { members, memberStats, addMember, deleteMember, apartment } = useApartment();
+  const { members, memberStats, addMember, updateMember, deleteMember, apartment } =
+    useApartment();
+  const { user } = useAuth();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -13,11 +16,33 @@ export default function MembersList() {
   const [isAdding, setIsAdding] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [error, setError] = useState('');
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingPhone, setEditingPhone] = useState('');
 
   const handleCopyInvite = () => {
-    navigator.clipboard.writeText(apartment.invite_code);
+    const inviteLink =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/login?invite=${apartment.invite_code}`
+        : apartment.invite_code;
+    navigator.clipboard.writeText(inviteLink);
     setCopiedInvite(true);
     setTimeout(() => setCopiedInvite(false), 2500);
+  };
+
+  const handleShareInviteWhatsApp = () => {
+    const link =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/login?invite=${apartment.invite_code}`
+        : '';
+    const text = `🏠 يا شباب، ده رابط الانضمام لمتابعة مصاريف سكننا (${apartment.name}) على تطبيق سكن سبليت:\n${link}\n\n🔑 رمز دعوة السكن: ${apartment.invite_code}\n(ادخل الرابط وسجل برقم هاتفك لتبدأ بمتابعة مصاريفك)`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleSavePhone = (memberId) => {
+    const clean = normalizePhone(editingPhone);
+    updateMember(memberId, { phone: clean });
+    setEditingMemberId(null);
+    setEditingPhone('');
   };
 
   const handleAddMember = (e) => {
@@ -49,15 +74,25 @@ export default function MembersList() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-xs self-start sm:self-auto">
-          <code className="px-3 py-1 font-mono text-base font-black tracking-widest text-emerald-200">
-            {apartment.invite_code}
-          </code>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-xs">
+            <code className="px-3 py-1 font-mono text-base font-black tracking-widest text-emerald-200">
+              {apartment.invite_code}
+            </code>
+            <button
+              onClick={handleCopyInvite}
+              className="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-xs transition-all"
+            >
+              {copiedInvite ? '✓ تم النسخ!' : 'نسخ رابط الدعوة'}
+            </button>
+          </div>
+
           <button
-            onClick={handleCopyInvite}
-            className="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-xs transition-all"
+            onClick={handleShareInviteWhatsApp}
+            className="px-3.5 py-2 rounded-2xl bg-emerald-700/80 hover:bg-emerald-800 text-white text-xs font-black shadow-xs transition-all flex items-center gap-1.5 border border-white/20"
           >
-            {copiedInvite ? '✓ تم النسخ!' : 'نسخ الكود'}
+            <span>📲</span>
+            <span>مشاركة الدعوة على واتساب</span>
           </button>
         </div>
       </div>
@@ -198,13 +233,56 @@ export default function MembersList() {
                         <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
                           {member.name}
                         </h3>
-                        {member.phone && (
-                          <p className="text-[11px] text-zinc-400">
-                            📞 {member.phone}
-                          </p>
+                        {editingMemberId === member.id ? (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <input
+                              type="tel"
+                              dir="ltr"
+                              placeholder="01XXXXXXXXX"
+                              value={editingPhone}
+                              onChange={(e) => setEditingPhone(e.target.value)}
+                              className="w-28 px-2 py-1 text-[11px] rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                            />
+                            <button
+                              onClick={() => handleSavePhone(member.id)}
+                              className="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold"
+                            >
+                              حفظ
+                            </button>
+                            <button
+                              onClick={() => setEditingMemberId(null)}
+                              className="text-[10px] text-zinc-400 hover:text-zinc-600"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {member.phone ? (
+                              <p className="text-[11px] text-zinc-400 font-mono">
+                                📞 {member.phone}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                لم يُسجل رقم الهاتف
+                              </p>
+                            )}
+
+                            {(user?.role === 'admin' || user?.id === member.id) && (
+                              <button
+                                onClick={() => {
+                                  setEditingMemberId(member.id);
+                                  setEditingPhone(member.phone || '');
+                                }}
+                                className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                              >
+                                {member.phone ? 'تعديل' : '+ إضافة رقم'}
+                              </button>
+                            )}
+                          </div>
                         )}
                         {member.email && (
-                          <p className="text-[11px] text-zinc-400">
+                          <p className="text-[11px] text-zinc-400 mt-0.5">
                             ✉️ {member.email}
                           </p>
                         )}

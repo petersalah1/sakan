@@ -125,8 +125,9 @@ export function ApartmentProvider({ children }) {
         // Filter out known deleted IDs
         const deletedIds = new Set(getStoredItem('deleted_settlement_ids', []));
 
-        // Known previous duplicates from rapid clicking
+        // Known previous phantom duplicates from rapid test clicking
         const KNOWN_DUPLICATE_IDS = new Set([
+          'c2af8beb-7bab-4a00-89c4-a98d34fa7e7a',
           '53c67a8c-f7f8-48ce-b0fb-be7efd40d859',
           '122d7d11-af86-4ffd-a6be-2b9b46cac172',
           'b4ed8227-f0d0-452a-9786-9aabbb982ab9',
@@ -136,6 +137,11 @@ export function ApartmentProvider({ children }) {
           '8c77801a-fd39-4620-92e5-8583b949e3a6',
           '301c394f-fa6d-4e8d-bb35-294bc0377da3',
           '8ec99b0f-f73c-4f15-afc9-6f62d808f18f',
+          '4d49ea59-78f7-4369-b956-b51598194eda',
+          '8bc875d5-dcdb-4de9-8a47-5eda52380f0e',
+          '1d83d189-8b34-4798-a394-c5720e16ceb0',
+          '0096b64d-b1ea-41a8-aba0-773b348b9072',
+          'a4d273a3-9e28-4f3f-9dd1-1d9e17b013f6',
         ]);
 
         const formattedSettlements = [];
@@ -484,6 +490,36 @@ export function ApartmentProvider({ children }) {
     }
   };
 
+  // Update Member details (e.g. phone, email)
+  const updateMember = async (id, updates) => {
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('profiles').update(updates).eq('id', id);
+      } catch (e) {
+        console.warn('Supabase member update error:', e);
+      }
+    }
+  };
+
+  // Clear all settlements
+  const clearAllSettlements = async () => {
+    const allIds = settlements.map((s) => s.id);
+    const existingDeleted = getStoredItem('deleted_settlement_ids', []);
+    const combined = Array.from(new Set([...existingDeleted, ...allIds]));
+    setStoredItem('deleted_settlement_ids', combined);
+
+    setSettlements([]);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('settlements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (e) {
+        console.warn('Supabase clear settlements error:', e);
+      }
+    }
+  };
+
   // Update Apartment Info
   const updateApartment = async (updates) => {
     setApartment((prev) => ({ ...prev, ...updates }));
@@ -519,9 +555,11 @@ export function ApartmentProvider({ children }) {
         addExpense,
         deleteExpense,
         addMember,
+        updateMember,
         deleteMember,
         recordSettlement,
         deleteSettlement,
+        clearAllSettlements,
         updateApartment,
         resetToDefaults,
         isSupabaseConnected: isSupabaseConfigured(),

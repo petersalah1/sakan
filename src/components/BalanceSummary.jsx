@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth, normalizePhone } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
 import SettleModal from './SettleModal';
 
@@ -15,6 +16,7 @@ export default function BalanceSummary() {
     deleteSettlement,
     apartment,
   } = useApartment();
+  const { user } = useAuth();
 
   const [activeSettlement, setActiveSettlement] = useState(null);
 
@@ -30,6 +32,15 @@ export default function BalanceSummary() {
     if (window.confirm('هل تريد حذف هذه التسوية من السجل وإعادة احتساب الدين؟')) {
       deleteSettlement(id);
     }
+  };
+
+  const handleNotifyCreditor = (settle) => {
+    const creditorPhone = settle.to.phone ? normalizePhone(settle.to.phone) : '';
+    const message = `يا ${settle.to.name}، أنا حولتلك مبلغ ${settle.amount} ${apartment.currency} لتسوية مصاريف السكن (${apartment.name}).\nبرجاء الدخول على سكن سبليت وتأكيد استلام المبلغ لتصفية الحساب 🤝`;
+    const url = creditorPhone
+      ? `https://wa.me/20${creditorPhone.startsWith('0') ? creditorPhone.substring(1) : creditorPhone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const handleShareWhatsApp = () => {
@@ -159,17 +170,56 @@ export default function BalanceSummary() {
                 </div>
 
                 {/* Amount & Settle Action */}
-                <div className="flex items-center justify-between sm:justify-end gap-4">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3">
                   <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(settle.amount, apartment.currency)}
                   </span>
 
-                  <button
-                    onClick={() => setActiveSettlement(settle)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-xs transition-all"
-                  >
-                    تسوية الآن
-                  </button>
+                  {(() => {
+                    const isCreditor = user?.id === settle.to.id;
+                    const isDebtor = user?.id === settle.from.id;
+                    const isAdmin =
+                      user?.role === 'admin' ||
+                      user?.id === '7585eb0f-839d-4a68-93ce-c114bbb1001a';
+                    const canSettle = isCreditor || isAdmin;
+
+                    if (canSettle) {
+                      return (
+                        <button
+                          onClick={() => setActiveSettlement(settle)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-xs transition-all flex items-center gap-1.5"
+                        >
+                          <span>✓</span>
+                          <span>تأكيد استلام المبلغ وتسوية</span>
+                        </button>
+                      );
+                    }
+
+                    if (isDebtor) {
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/60 flex items-center gap-1">
+                            <span>⏳</span>
+                            <span>في انتظار تأكيد {settle.to.name}</span>
+                          </span>
+                          <button
+                            onClick={() => handleNotifyCreditor(settle)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 shadow-xs"
+                            title="إرسال إشعار للمستلم على واتساب ليؤكد الاستلام"
+                          >
+                            <span>📲</span>
+                            <span>إشعار بالتحويل</span>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <span className="px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-xs font-bold">
+                        🔒 خاصة بالمستلم ({settle.to.name})
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -293,26 +343,36 @@ export default function BalanceSummary() {
 
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-zinc-400 font-medium text-[11px] dir-ltr">{dateText}</span>
-                    <button
-                      onClick={() => handleDeleteSettlement(s.id)}
-                      title="حذف هذه التسوية"
-                      className="p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-500 transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                    {(() => {
+                      const canDelete =
+                        user?.id === s.to_member_id ||
+                        user?.role === 'admin' ||
+                        user?.id === '7585eb0f-839d-4a68-93ce-c114bbb1001a';
+                      if (!canDelete) return null;
+
+                      return (
+                        <button
+                          onClick={() => handleDeleteSettlement(s.id)}
+                          title="حذف هذه التسوية (المستلم والمشرف فقط)"
+                          className="p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-500 transition-colors"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );

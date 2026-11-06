@@ -2,22 +2,24 @@
 
 import React, { useState } from 'react';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth } from '@/hooks/useAuth';
 import { EXPENSE_CATEGORIES } from '@/utils/categories';
 import { formatCurrency } from '@/utils/currency';
 
 export default function AddExpenseModal({ isOpen, onClose }) {
   const { members, addExpense, apartment } = useApartment();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(members[0]?.id || '');
+  const [paidBy, setPaidBy] = useState(() => user?.id || members[0]?.id || '');
   const [category, setCategory] = useState('food');
   const [splits, setSplits] = useState(members.map((m) => m.id));
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
-  const activePaidBy = paidBy || members[0]?.id || '';
+  const activePaidBy = paidBy || user?.id || members[0]?.id || '';
   const activeSplits = splits.length > 0 ? splits : members.map((m) => m.id);
 
   if (!isOpen) return null;

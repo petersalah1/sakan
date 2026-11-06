@@ -3,6 +3,7 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { ApartmentProvider } from '@/hooks/useApartment';
 import Navbar from '@/components/Navbar';
 import InstallAppBanner from '@/components/InstallAppBanner';
+import AuthGuard from '@/components/AuthGuard';
 
 export const metadata = {
   title: 'سَكَن سبليت - تنظيم ومشاركة مصاريف السكن والشقق',
@@ -42,7 +43,7 @@ export default function RootLayout({ children }) {
             <Navbar />
             <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
               <InstallAppBanner />
-              {children}
+              <AuthGuard>{children}</AuthGuard>
             </main>
             <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 text-center text-xs text-zinc-400">
               <p>سَكَن سبليت (Sakan Split) • إدارة مصاريف السكن المشترك بكل سهولة وشفافية</p>

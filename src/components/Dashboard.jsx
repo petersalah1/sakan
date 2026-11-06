@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
 import { getCategoryById } from '@/utils/categories';
 import StatCard from './StatCard';
@@ -18,6 +19,7 @@ export default function Dashboard() {
     suggestedSettlements,
     memberStats,
   } = useApartment();
+  const { user } = useAuth();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeSettlement, setActiveSettlement] = useState(null);
@@ -122,12 +124,35 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveSettlement(suggestedSettlements[0])}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all self-start sm:self-auto"
-          >
-            سداد وتسوية الآن
-          </button>
+          {(() => {
+            const firstSettle = suggestedSettlements[0];
+            const isCreditor = user?.id === firstSettle.to.id;
+            const isAdmin =
+              user?.role === 'admin' ||
+              user?.id === '7585eb0f-839d-4a68-93ce-c114bbb1001a';
+            const canSettle = isCreditor || isAdmin;
+
+            if (canSettle) {
+              return (
+                <button
+                  onClick={() => setActiveSettlement(firstSettle)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition-all self-start sm:self-auto flex items-center gap-1.5"
+                >
+                  <span>✓</span>
+                  <span>تأكيد استلام المبلغ وتسوية</span>
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                href="/settlements"
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all self-start sm:self-auto"
+              >
+                عرض تفاصيل التسوية
+              </Link>
+            );
+          })()}
         </div>
       )}
 

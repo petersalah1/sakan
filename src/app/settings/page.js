@@ -8,6 +8,7 @@ export default function SettingsPage() {
     apartment,
     updateApartment,
     resetToDefaults,
+    clearAllSettlements,
     isSupabaseConnected,
   } = useApartment();
 
@@ -150,21 +151,39 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
           استعادة البيانات الافتراضية وحذف أي مصاريف أو أعضاء تم تسجيلهم محلياً.
         </p>
 
-        <button
-          onClick={() => {
-            if (
-              confirm(
-                'هل أنت متأكد من رغبتك في استعادة البيانات التجريبية الافتراضية؟'
-              )
-            ) {
-              resetToDefaults();
-              setSaveMessage('تم استعادة البيانات الافتراضية بنجاح.');
-            }
-          }}
-          className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-xs transition-all"
-        >
-          استعادة البيانات التجريبية الافتراضية
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  'هل أنت متأكد من تصفير وحذف جميع سجلات التسويات السابقة؟'
+                )
+              ) {
+                clearAllSettlements();
+                setSaveMessage('تم تصفير سجل التسويات بنجاح.');
+              }
+            }}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-xs transition-all"
+          >
+            تصفير سجل التسويات السابقة
+          </button>
+
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  'هل أنت متأكد من رغبتك في استعادة البيانات التجريبية الافتراضية؟'
+                )
+              ) {
+                resetToDefaults();
+                setSaveMessage('تم استعادة البيانات الافتراضية بنجاح.');
+              }
+            }}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-xs transition-all"
+          >
+            استعادة البيانات التجريبية الافتراضية
+          </button>
+        </div>
       </div>
     </div>
   );
