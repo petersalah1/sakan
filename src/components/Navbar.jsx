@@ -19,7 +19,9 @@ export default function Navbar() {
     { href: '/expenses', label: 'المصاريف', icon: '💸' },
     { href: '/settlements', label: 'التسويات', icon: '🤝' },
     { href: '/members', label: 'الساكنين', icon: '👥' },
-    { href: '/settings', label: 'الإعدادات', icon: '⚙️' },
+    ...(user?.role === 'admin'
+      ? [{ href: '/settings', label: 'الإعدادات', icon: '⚙️' }]
+      : []),
   ];
 
   return (

@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user, isLoaded } = useAuth();
   const {
     apartment,
     updateApartment,
@@ -12,12 +16,48 @@ export default function SettingsPage() {
     isSupabaseConnected,
   } = useApartment();
 
-  const [name, setName] = useState(apartment.name);
-  const [currency, setCurrency] = useState(apartment.currency || 'ج.م');
+  const [name, setName] = useState(apartment?.name || '');
+  const [currency, setCurrency] = useState(apartment?.currency || 'ج.م');
   const [saveMessage, setSaveMessage] = useState('');
+
+  useEffect(() => {
+    if (isLoaded && (!user || user.role !== 'admin')) {
+      router.replace('/');
+    }
+  }, [user, isLoaded, router]);
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-bold text-zinc-500">جاري التحقق من الصلاحيات...</p>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="max-w-md mx-auto my-12 bg-white dark:bg-zinc-900 rounded-3xl p-8 text-center border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <span className="text-4xl block mb-3">🛡️</span>
+        <h2 className="text-lg font-black text-zinc-900 dark:text-zinc-100 mb-2">
+          صفحة الإعدادات مخصصة للمشرف فقط
+        </h2>
+        <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+          عفواً، هذه الصفحة مخصصة لمدير ومشرف السكن (بيتر صلاح) لإدارة خصائص الشقة وقواعد البيانات.
+        </p>
+        <button
+          onClick={() => router.push('/')}
+          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+        >
+          العودة للرئيسية
+        </button>
+      </div>
+    );
+  }
 
   const handleSave = (e) => {
     e.preventDefault();
+    if (user?.role !== 'admin') return;
     updateApartment({ name, currency });
     setSaveMessage('تم حفظ إعدادات السكن بنجاح!');
     setTimeout(() => setSaveMessage(''), 3000);
