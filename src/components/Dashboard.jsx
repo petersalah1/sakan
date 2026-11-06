@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useApartment } from '@/hooks/useApartment';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
@@ -11,6 +12,7 @@ import AddExpenseModal from './AddExpenseModal';
 import SettleModal from './SettleModal';
 
 export default function Dashboard() {
+  const router = useRouter();
   const {
     apartment,
     members,
@@ -47,7 +49,13 @@ export default function Dashboard() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                if (!user) {
+                  router.push('/login');
+                  return;
+                }
+                setShowAddModal(true);
+              }}
               className="px-5 py-3 bg-white text-emerald-800 hover:bg-emerald-50 active:bg-emerald-100 font-black rounded-2xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
             >
               <span className="text-lg">+</span>

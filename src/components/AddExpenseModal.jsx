@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApartment } from '@/hooks/useApartment';
 import { useAuth } from '@/hooks/useAuth';
 import { EXPENSE_CATEGORIES } from '@/utils/categories';
 import { formatCurrency } from '@/utils/currency';
 
 export default function AddExpenseModal({ isOpen, onClose }) {
+  const router = useRouter();
   const { members, addExpense, apartment } = useApartment();
   const { user } = useAuth();
 
@@ -24,6 +26,41 @@ export default function AddExpenseModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-150">
+          <span className="text-4xl block mb-3">🔒</span>
+          <h3 className="text-base font-black text-zinc-900 dark:text-zinc-100 mb-1">
+            تسجيل الدخول مطلوب
+          </h3>
+          <p className="text-xs text-zinc-400 mb-5 leading-relaxed">
+            يجب تسجيل الدخول بحسابك أولاً لتتمكن من إضافة وقيد مصاريف السكن.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-all"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                router.push('/login');
+              }}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition-all"
+            >
+              تسجيل الدخول
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const toggleSplitMember = (id) => {
     setSplits((prev) =>
       prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
@@ -36,6 +73,11 @@ export default function AddExpenseModal({ isOpen, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    if (!user) {
+      setError('يجب تسجيل الدخول أولاً لتسجيل مصروف');
+      return;
+    }
 
     const parsedAmount = parseFloat(amount);
     if (!title.trim()) {
@@ -187,17 +229,24 @@ export default function AddExpenseModal({ isOpen, onClose }) {
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
                 مين دفع المبلغ؟ *
               </label>
-              <select
-                value={activePaidBy}
-                onChange={(e) => setPaidBy(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+              {user?.role === 'admin' ? (
+                <select
+                  value={activePaidBy}
+                  onChange={(e) => setPaidBy(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.id === user?.id ? '(أنت)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                  <span>أنت ({user?.name}) دفعته بالكامل</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">سيتم قيد المبلغ لحسابك</span>
+                </div>
+              )}
             </div>
 
             {/* Split Among Members */}

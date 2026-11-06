@@ -6,6 +6,8 @@ import { getStoredItem, setStoredItem } from '@/lib/storage';
 
 const AuthContext = createContext(null);
 
+export const ADMIN_PASSCODE = '1042004'; // Peter Salah's secure admin PIN (derived from petersalah104)
+
 export function normalizePhone(raw = '') {
   if (!raw) return '';
   const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -45,6 +47,7 @@ export function AuthProvider({ children }) {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
+      .eq('is_active', true)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
@@ -59,46 +62,45 @@ export function AuthProvider({ children }) {
           };
           setUser(updated);
           setStoredItem('user', updated);
+        } else {
+          // If deactivated or deleted, log out
+          setUser(null);
+          setStoredItem('user', null);
         }
       });
   }, [user?.id]);
 
-  // Login with Phone or Email (Fast lookup in invited members)
-  const loginWithIdentifier = useCallback(async (identifier) => {
+  // Login for Roommates: By phone number added by Peter
+  const loginWithPhone = useCallback(async (phoneInput) => {
     setLoading(true);
     try {
-      const trimmed = (identifier || '').trim();
-      if (!trimmed) {
-        return { success: false, error: 'يرجى كتابة رقم الهاتف أو البريد الإلكتروني' };
+      const cleanPhone = normalizePhone(phoneInput);
+      if (!cleanPhone || cleanPhone.length < 8) {
+        return { success: false, error: 'يرجى كتابة رقم هاتف صحيح مكون من 11 رقماً' };
       }
-
-      const isEmail = trimmed.includes('@');
-      const cleanPhone = normalizePhone(trimmed);
-      const cleanEmail = trimmed.toLowerCase();
 
       let matchedProfile = null;
 
       if (isSupabaseConfigured()) {
-        const { data: profiles, error } = await supabase.from('profiles').select('*');
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('is_active', true);
+
         if (!error && profiles) {
           matchedProfile = profiles.find((p) => {
-            if (isEmail && p.email && p.email.toLowerCase() === cleanEmail) return true;
-            if (cleanPhone && p.phone && normalizePhone(p.phone) === cleanPhone) return true;
-            // Also allow matching by exact name if no phone/email was entered
-            if (p.name && p.name.trim().toLowerCase() === trimmed.toLowerCase()) return true;
-            return false;
+            if (!p.phone) return false;
+            return normalizePhone(p.phone) === cleanPhone;
           });
         }
       }
 
-      // Fallback to local members if offline or not in Supabase yet
+      // Fallback to local members if offline
       if (!matchedProfile) {
         const localMembers = getStoredItem('members', []);
         matchedProfile = localMembers.find((p) => {
-          if (isEmail && p.email && p.email.toLowerCase() === cleanEmail) return true;
-          if (cleanPhone && p.phone && normalizePhone(p.phone) === cleanPhone) return true;
-          if (p.name && p.name.trim().toLowerCase() === trimmed.toLowerCase()) return true;
-          return false;
+          if (!p.phone) return false;
+          return normalizePhone(p.phone) === cleanPhone;
         });
       }
 
@@ -109,7 +111,7 @@ export function AuthProvider({ children }) {
           email: matchedProfile.email || '',
           phone: matchedProfile.phone || '',
           role: matchedProfile.role || 'member',
-          avatar_color: matchedProfile.avatar_color || 'bg-emerald-500',
+          avatar_color: matchedProfile.avatar_color || 'bg-blue-500',
           apartment_id: matchedProfile.apartment_id,
         };
         setUser(loggedUser);
@@ -119,8 +121,8 @@ export function AuthProvider({ children }) {
 
       return {
         success: false,
-        notFound: true,
-        error: 'لم نجد حساباً مسجلاً بهذا الرقم أو الإيميل. إذا كنت ساكناً جديداً، يرجى استخدام تبويب "الانضمام برمز الدعوة".',
+        error:
+          'رقم الهاتف غير مسجل في السكن! الدخول مقتصر فقط على الأعضاء الذين أضافهم المشرف بيتر صلاح. يرجى التواصل معه لإضافتك أولاً.',
       };
     } catch (err) {
       return { success: false, error: err.message || 'حدث خطأ أثناء تسجيل الدخول' };
@@ -129,157 +131,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Join or Claim an existing invited profile using the Apartment Invite Code
-  const joinWithInvite = useCallback(async ({ inviteCode, memberId, name, phone, email }) => {
+  // Login for Peter Salah (Admin): Secure with Admin PIN
+  const loginAsAdmin = useCallback(async (passcode) => {
     setLoading(true);
     try {
-      const cleanCode = (inviteCode || '').trim().toUpperCase();
-      if (!cleanCode) {
-        return { success: false, error: 'يرجى إدخال رمز دعوة السكن' };
+      const cleanCode = (passcode || '').trim();
+      if (cleanCode !== ADMIN_PASSCODE && cleanCode !== '1042004') {
+        return { success: false, error: 'رمز مرور المشرف غير صحيح! هذه الصفحة مخصصة لبيتر صلاح فقط.' };
       }
 
-      // 1. Verify Invite Code against Apartment in Supabase
-      let aptInviteCode = 'PETER2026';
-      let aptId = 'd71498f6-43c2-4824-9685-cba44c879acf';
-
-      if (isSupabaseConfigured()) {
-        const { data: aptData } = await supabase.from('apartments').select('*').limit(1).maybeSingle();
-        if (aptData) {
-          aptInviteCode = (aptData.invite_code || 'PETER2026').trim().toUpperCase();
-          aptId = aptData.id;
-        }
-      }
-
-      if (cleanCode !== aptInviteCode) {
-        return {
-          success: false,
-          error: 'رمز الدعوة غير صحيح! الدخول بدعوة فقط من المشرف بيتر صلاح. اطلب الرمز منه للمتابعة.',
-        };
-      }
-
-      const cleanPhone = normalizePhone(phone);
-      const cleanEmail = (email || '').trim().toLowerCase();
-
-      // Case A: Claim an existing profile (e.g. Peter already added 'مقار', and مقار enters his phone)
-      if (memberId) {
-        let updatedProfile = null;
-        if (isSupabaseConfigured()) {
-          const updates = {};
-          if (cleanPhone) updates.phone = cleanPhone;
-          if (cleanEmail) updates.email = cleanEmail;
-
-          const { data } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', memberId)
-            .select()
-            .single();
-          if (data) updatedProfile = data;
-        }
-
-        if (!updatedProfile) {
-          const localMembers = getStoredItem('members', []);
-          const found = localMembers.find((m) => m.id === memberId);
-          if (found) {
-            updatedProfile = {
-              ...found,
-              phone: cleanPhone || found.phone,
-              email: cleanEmail || found.email,
-            };
-          }
-        }
-
-        if (updatedProfile) {
-          const loggedUser = {
-            id: updatedProfile.id,
-            name: updatedProfile.name,
-            email: updatedProfile.email || '',
-            phone: updatedProfile.phone || '',
-            role: updatedProfile.role || 'member',
-            avatar_color: updatedProfile.avatar_color || 'bg-emerald-500',
-            apartment_id: updatedProfile.apartment_id,
-          };
-          setUser(loggedUser);
-          setStoredItem('user', loggedUser);
-          return { success: true, user: loggedUser };
-        }
-      }
-
-      // Case B: Create brand new roommate profile with valid invite code
-      const cleanName = (name || '').trim();
-      if (!cleanName) {
-        return { success: false, error: 'يرجى كتابة اسمك للانضمام للسكن' };
-      }
-
-      const colors = [
-        'bg-blue-500',
-        'bg-purple-500',
-        'bg-amber-500',
-        'bg-rose-500',
-        'bg-teal-500',
-        'bg-indigo-500',
-        'bg-cyan-500',
-      ];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-      let createdMember = null;
-      if (isSupabaseConfigured()) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              apartment_id: aptId,
-              name: cleanName,
-              phone: cleanPhone,
-              email: cleanEmail,
-              role: 'member',
-              avatar_color: randomColor,
-              is_active: true,
-            },
-          ])
-          .select()
-          .single();
-
-        if (!error && data) createdMember = data;
-      }
-
-      if (!createdMember) {
-        createdMember = {
-          id: 'mem-' + Date.now(),
-          apartment_id: aptId,
-          name: cleanName,
-          phone: cleanPhone,
-          email: cleanEmail,
-          role: 'member',
-          avatar_color: randomColor,
-          is_active: true,
-        };
-      }
-
-      const loggedUser = {
-        id: createdMember.id,
-        name: createdMember.name,
-        email: createdMember.email || '',
-        phone: createdMember.phone || '',
-        role: createdMember.role || 'member',
-        avatar_color: createdMember.avatar_color || 'bg-emerald-500',
-        apartment_id: createdMember.apartment_id,
-      };
-
-      setUser(loggedUser);
-      setStoredItem('user', loggedUser);
-      return { success: true, user: loggedUser };
-    } catch (err) {
-      return { success: false, error: err.message || 'فشل الانضمام برمز الدعوة' };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Quick Login as Peter Salah (Admin)
-  const loginAsPeter = useCallback(async () => {
-    setLoading(true);
-    try {
       let peterProfile = null;
       if (isSupabaseConfigured()) {
         const { data } = await supabase
@@ -320,22 +180,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Direct login as a selected existing member (from apartment list)
-  const loginAsMember = useCallback((member) => {
-    if (!member) return;
-    const loggedUser = {
-      id: member.id,
-      name: member.name,
-      email: member.email || '',
-      phone: member.phone || '',
-      role: member.role || 'member',
-      avatar_color: member.avatar_color || 'bg-emerald-500',
-      apartment_id: member.apartment_id,
-    };
-    setUser(loggedUser);
-    setStoredItem('user', loggedUser);
-  }, []);
-
   // Logout
   const logout = useCallback(() => {
     setUser(null);
@@ -348,12 +192,11 @@ export function AuthProvider({ children }) {
         user,
         isLoaded,
         loading,
-        loginWithIdentifier,
-        joinWithInvite,
-        loginAsPeter,
-        loginAsMember,
+        loginWithPhone,
+        loginAsAdmin,
         logout,
         isAuthenticated: Boolean(user),
+        isAdmin: user?.role === 'admin' || user?.id === '7585eb0f-839d-4a68-93ce-c114bbb1001a',
       }}
     >
       {children}

@@ -51,6 +51,10 @@ export default function MembersList() {
       setError('يرجى كتابة اسم الساكن');
       return;
     }
+    if (!phone.trim()) {
+      setError('يرجى إدخال رقم هاتف الساكن ليتمكن من تسجيل الدخول به');
+      return;
+    }
 
     addMember({ name, phone, email });
     setName('');
@@ -60,41 +64,35 @@ export default function MembersList() {
     setIsAdding(false);
   };
 
+  const isAdmin = user?.role === 'admin' || user?.id === '7585eb0f-839d-4a68-93ce-c114bbb1001a';
+
   return (
     <div className="space-y-6">
-      {/* Apartment Invite Box */}
+      {/* Apartment Header Banner */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-3xl p-6 text-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full mb-2 inline-block">
-            رمز دعوة السكن
+            {isAdmin ? 'لوحة تحكم المشرف' : 'سكن مشترك'}
           </span>
-          <h3 className="text-xl font-black">{apartment.name}</h3>
+          <h3 className="text-xl font-black">{apartment.name} 🏠</h3>
           <p className="text-xs text-emerald-100 mt-1">
-            شارك هذا الكود مع زملائك في الشقة للانضمام ومتابعة الحسابات المشتركة
+            {isAdmin
+              ? 'أنت المشرف الوحيد المخول بإضافة الساكنين وتحديد من له حق الدخول'
+              : 'قائمة الساكنين المعتمدين في الشقة من قبل المشرف بيتر صلاح'}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-2 bg-black/20 p-2 rounded-2xl backdrop-blur-xs">
-            <code className="px-3 py-1 font-mono text-base font-black tracking-widest text-emerald-200">
-              {apartment.invite_code}
-            </code>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <button
-              onClick={handleCopyInvite}
-              className="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-xs transition-all"
+              onClick={handleShareInviteWhatsApp}
+              className="px-4 py-2.5 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black shadow-xs transition-all flex items-center gap-1.5"
             >
-              {copiedInvite ? '✓ تم النسخ!' : 'نسخ رابط الدعوة'}
+              <span>📲</span>
+              <span>إرسال رابط السكن للساكنين عبر واتساب</span>
             </button>
           </div>
-
-          <button
-            onClick={handleShareInviteWhatsApp}
-            className="px-3.5 py-2 rounded-2xl bg-emerald-700/80 hover:bg-emerald-800 text-white text-xs font-black shadow-xs transition-all flex items-center gap-1.5 border border-white/20"
-          >
-            <span>📲</span>
-            <span>مشاركة الدعوة على واتساب</span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Main Members Section */}
@@ -112,7 +110,7 @@ export default function MembersList() {
             </p>
           </div>
 
-          {!isAdding && (
+          {isAdmin && !isAdding && (
             <button
               onClick={() => setIsAdding(true)}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all self-start sm:self-auto shadow-xs"
@@ -123,15 +121,15 @@ export default function MembersList() {
           )}
         </div>
 
-        {/* Add Member Form */}
-        {isAdding && (
+        {/* Add Member Form (Admin only) */}
+        {isAdmin && isAdding && (
           <form
             onSubmit={handleAddMember}
             className="mb-6 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-950/20"
           >
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">
-                إضافة شريك سكن جديد
+                إضافة ساكن جديد للسكن (منح صلاحية الدخول)
               </h4>
               <button
                 type="button"
@@ -148,14 +146,15 @@ export default function MembersList() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">
-                  الاسم بالكامل *
+                  اسم الساكن بالكامل *
                 </label>
                 <input
                   type="text"
-                  placeholder="مثال: يوسف حسام"
+                  required
+                  placeholder="مثال: مقار أو مينا"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -164,44 +163,26 @@ export default function MembersList() {
 
               <div>
                 <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">
-                  رقم الهاتف (اختياري)
+                  رقم الهاتف (لتسجيل دخوله) *
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  required
+                  dir="ltr"
                   placeholder="01XXXXXXXXX"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">
-                  البريد الإلكتروني (اختياري)
-                </label>
-                <input
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
             </div>
 
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsAdding(false)}
-                className="px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-500"
-              >
-                إلغاء
-              </button>
+            <div className="mt-3 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition-all"
               >
-                حفظ العضو
+                حفظ وإضافة الساكن
               </button>
             </div>
           </form>
@@ -289,18 +270,18 @@ export default function MembersList() {
                       </div>
                     </div>
 
-                    {members.length > 1 && (
+                    {isAdmin && member.role !== 'admin' && (
                       <button
                         onClick={() => {
                           if (
                             confirm(
-                              `هل أنت متأكد من حذف ${member.name} من قائمة السكن؟`
+                              `هل أنت متأكد من حذف ${member.name} وإلغاء صلاحية دخوله للسكن؟`
                             )
                           ) {
                             deleteMember(member.id);
                           }
                         }}
-                        title="حذف العضو"
+                        title="حذف العضو وإلغاء صلاحية دخوله"
                         className="text-zinc-400 hover:text-rose-500 text-xs p-1"
                       >
                         ✕

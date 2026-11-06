@@ -2,11 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApartment } from '@/hooks/useApartment';
+import { useAuth } from '@/hooks/useAuth';
 import { getCategoryById, EXPENSE_CATEGORIES } from '@/utils/categories';
 import { formatCurrency } from '@/utils/currency';
 
 export default function ExpenseList() {
   const { expenses, members, deleteExpense, apartment } = useApartment();
+  const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -180,17 +182,19 @@ export default function ExpenseList() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      if (confirm(`هل أنت متأكد من حذف عملية "${exp.title}"؟`)) {
-                        deleteExpense(exp.id);
-                      }
-                    }}
-                    title="حذف المصروف"
-                    className="p-2 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all"
-                  >
-                    🗑️
-                  </button>
+                  {(user?.role === 'admin' || user?.id === exp.paid_by) && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`هل أنت متأكد من حذف عملية "${exp.title}"؟`)) {
+                          deleteExpense(exp.id);
+                        }
+                      }}
+                      title="حذف المصروف"
+                      className="p-2 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all"
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             );

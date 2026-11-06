@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import ExpenseList from '@/components/ExpenseList';
 import AddExpenseModal from '@/components/AddExpenseModal';
 
 export default function ExpensesPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
 
   return (
@@ -20,7 +24,13 @@ export default function ExpensesPage() {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            if (!user) {
+              router.push('/login');
+              return;
+            }
+            setShowAddModal(true);
+          }}
           className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 self-start sm:self-auto"
         >
           <span>+</span>

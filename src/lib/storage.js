@@ -27,7 +27,7 @@ export const INITIAL_SETTLEMENTS = [];
 export function getStoredItem(key, fallback) {
   if (typeof window === 'undefined') return fallback;
   try {
-    const item = localStorage.getItem(`sakan_v3_${key}`);
+    const item = localStorage.getItem(`sakan_v4_${key}`);
     return item ? JSON.parse(item) : fallback;
   } catch (err) {
     console.warn(`Error reading ${key} from storage:`, err);
@@ -38,7 +38,7 @@ export function getStoredItem(key, fallback) {
 export function setStoredItem(key, value) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(`sakan_v3_${key}`, JSON.stringify(value));
+    localStorage.setItem(`sakan_v4_${key}`, JSON.stringify(value));
   } catch (err) {
     console.warn(`Error saving ${key} to storage:`, err);
   }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/storage';
 import { calculateBalancesAndSettlements } from '@/utils/settlementCalculator';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { normalizePhone } from '@/hooks/useAuth';
 
 const ApartmentContext = createContext(null);
 
@@ -60,23 +61,27 @@ export function ApartmentProvider({ children }) {
         }
       }
 
-      // 2. Fetch Members
+      // 2. Fetch Active Members
       const { data: memData } = await supabase
         .from('profiles')
         .select('*')
+        .eq('is_active', true)
         .order('created_at', { ascending: true });
 
-      if (memData && memData.length > 0) {
-        setMembers(memData);
+      let currentMembers = memData || [];
+
+      if (currentMembers.length > 0) {
+        setMembers(currentMembers);
       } else {
-        // Seed default members if profiles is empty
+        // Seed default Peter Salah if profiles has no active members
         const initialProfiles = INITIAL_MEMBERS.map((m) => ({
           apartment_id: currentAptId,
           name: m.name,
           email: m.email,
           phone: m.phone,
           avatar_color: m.avatar_color,
-          role: m.role || 'member',
+          role: m.role || 'admin',
+          is_active: true,
         }));
         const { data: createdMembers } = await supabase
           .from('profiles')
@@ -84,39 +89,44 @@ export function ApartmentProvider({ children }) {
           .select();
         if (createdMembers && createdMembers.length > 0) {
           setMembers(createdMembers);
+          currentMembers = createdMembers;
         }
       }
 
-      // 3. Fetch Expenses with splits
+      const activeMemberIds = new Set(currentMembers.map((m) => m.id));
+
+      // 3. Fetch Expenses with splits (only for active members)
       const { data: expData } = await supabase
         .from('expenses')
         .select('*, expense_splits(*)')
         .order('expense_date', { ascending: false });
 
       if (expData) {
-        const formattedExpenses = expData.map((e) => ({
-          id: e.id,
-          title: e.title,
-          amount: parseFloat(e.amount),
-          paid_by: e.paid_by,
-          category: e.category,
-          expense_date: e.expense_date,
-          splits: (e.expense_splits || []).map((s) => s.member_id),
-          notes: e.notes || '',
-          created_at: e.created_at,
-        }));
+        const formattedExpenses = expData
+          .filter((e) => activeMemberIds.has(e.paid_by))
+          .map((e) => ({
+            id: e.id,
+            title: e.title,
+            amount: parseFloat(e.amount),
+            paid_by: e.paid_by,
+            category: e.category,
+            expense_date: e.expense_date,
+            splits: (e.expense_splits || []).map((s) => s.member_id),
+            notes: e.notes || '',
+            created_at: e.created_at,
+          }));
         setExpenses(formattedExpenses);
+      } else {
+        setExpenses([]);
       }
 
-      // 4. Fetch Settlements
+      // 4. Fetch Settlements (only between active members)
       const { data: setlData } = await supabase
         .from('settlements')
         .select('*')
         .order('settled_at', { ascending: false });
 
       if (setlData) {
-        // Map members for lookup
-        const currentMembers = memData || [];
         const membersById = {};
         currentMembers.forEach((m) => {
           membersById[m.id] = m;
@@ -125,30 +135,15 @@ export function ApartmentProvider({ children }) {
         // Filter out known deleted IDs
         const deletedIds = new Set(getStoredItem('deleted_settlement_ids', []));
 
-        // Known previous phantom duplicates from rapid test clicking
-        const KNOWN_DUPLICATE_IDS = new Set([
-          'c2af8beb-7bab-4a00-89c4-a98d34fa7e7a',
-          '53c67a8c-f7f8-48ce-b0fb-be7efd40d859',
-          '122d7d11-af86-4ffd-a6be-2b9b46cac172',
-          'b4ed8227-f0d0-452a-9786-9aabbb982ab9',
-          '74d60bb0-229a-417e-a3b7-e2dfc2b23d1f',
-          '3802f26c-d18d-4012-81ab-34e9ffedc504',
-          'df4f3d7a-4c6d-4f00-a42b-a709999462a9',
-          '8c77801a-fd39-4620-92e5-8583b949e3a6',
-          '301c394f-fa6d-4e8d-bb35-294bc0377da3',
-          '8ec99b0f-f73c-4f15-afc9-6f62d808f18f',
-          '4d49ea59-78f7-4369-b956-b51598194eda',
-          '8bc875d5-dcdb-4de9-8a47-5eda52380f0e',
-          '1d83d189-8b34-4798-a394-c5720e16ceb0',
-          '0096b64d-b1ea-41a8-aba0-773b348b9072',
-          'a4d273a3-9e28-4f3f-9dd1-1d9e17b013f6',
-        ]);
-
         const formattedSettlements = [];
         const seenSignatures = new Set();
 
         for (const s of setlData) {
-          if (deletedIds.has(s.id) || KNOWN_DUPLICATE_IDS.has(s.id)) continue;
+          // Strictly require both parties to be currently active members!
+          if (!activeMemberIds.has(s.from_member_id) || !activeMemberIds.has(s.to_member_id)) {
+            continue;
+          }
+          if (deletedIds.has(s.id)) continue;
 
           // Prevent identical rapid submissions on the same minute
           const dateMinute = s.settled_at ? s.settled_at.substring(0, 16) : '';
@@ -174,6 +169,8 @@ export function ApartmentProvider({ children }) {
         }
 
         setSettlements(formattedSettlements);
+      } else {
+        setSettlements([]);
       }
 
       setSyncStatus('synced');
@@ -338,7 +335,6 @@ export function ApartmentProvider({ children }) {
   // Add Member
   const addMember = async (memberData) => {
     const colors = [
-      'bg-emerald-500',
       'bg-blue-500',
       'bg-purple-500',
       'bg-amber-500',
@@ -349,14 +345,16 @@ export function ApartmentProvider({ children }) {
     ];
 
     const tempId = 'm-' + Date.now();
+    const cleanPhone = normalizePhone(memberData.phone);
     const newMember = {
       id: tempId,
       apartment_id: apartment.id,
       name: memberData.name.trim(),
       email: memberData.email?.trim() || '',
-      phone: memberData.phone?.trim() || '',
+      phone: cleanPhone,
       role: 'member',
       avatar_color: colors[members.length % colors.length],
+      is_active: true,
       created_at: new Date().toISOString(),
     };
 
@@ -373,7 +371,8 @@ export function ApartmentProvider({ children }) {
               email: newMember.email,
               phone: newMember.phone,
               avatar_color: newMember.avatar_color,
-              role: newMember.role,
+              role: 'member',
+              is_active: true,
             },
           ])
           .select()
@@ -397,7 +396,7 @@ export function ApartmentProvider({ children }) {
     setMembers((prev) => prev.filter((m) => m.id !== id));
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('profiles').delete().eq('id', id);
+        await supabase.from('profiles').update({ is_active: false }).eq('id', id);
       } catch (e) {
         console.warn('Supabase member delete error:', e);
       }

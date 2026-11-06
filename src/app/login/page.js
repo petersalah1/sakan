@@ -1,42 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useApartment } from '@/hooks/useApartment';
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const {
-    user,
-    loading,
-    loginWithIdentifier,
-    joinWithInvite,
-    loginAsPeter,
-    loginAsMember,
-    logout,
-  } = useAuth();
-  const { apartment, members } = useApartment();
+  const { user, loading, loginWithPhone, loginAsAdmin, logout } = useAuth();
+  const { apartment } = useApartment();
 
-  const inviteFromUrl = searchParams.get('invite') || '';
-
-  const [activeTab, setActiveTab] = useState(inviteFromUrl ? 'invite' : 'login');
-  const [identifier, setIdentifier] = useState('');
-  const [inviteCode, setInviteCode] = useState(inviteFromUrl.toUpperCase());
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [selectedMemberToClaim, setSelectedMemberToClaim] = useState('');
+  const [activeTab, setActiveTab] = useState('member'); // 'member' | 'admin'
+  const [phone, setPhone] = useState('');
+  const [adminPin, setAdminPin] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Handle Login with Phone / Email
-  const handleLogin = async (e) => {
+  // Handle Roommate Phone Login
+  const handleMemberLogin = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
-    const res = await loginWithIdentifier(identifier);
+    const res = await loginWithPhone(phone);
     if (res.success) {
       setSuccessMsg(`أهلاً بك يا ${res.user.name}! جاري الدخول...`);
       setTimeout(() => router.push('/'), 600);
@@ -45,44 +31,23 @@ function LoginContent() {
     }
   };
 
-  // Handle Join with Invite Code
-  const handleJoinInvite = async (e) => {
+  // Handle Admin Peter Login
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
-    const res = await joinWithInvite({
-      inviteCode: inviteCode || apartment.invite_code,
-      memberId: selectedMemberToClaim || null,
-      name: newName,
-      phone: newPhone,
-    });
-
+    const res = await loginAsAdmin(adminPin);
     if (res.success) {
-      setSuccessMsg(`تم الانضمام بنجاح! مرحباً بك يا ${res.user.name}`);
-      setTimeout(() => router.push('/'), 700);
+      setSuccessMsg('مرحباً بك يا بيتر! جاري الدخول كمدير للسكن...');
+      setTimeout(() => router.push('/'), 600);
     } else {
-      setError(res.error || 'فشل الانضمام برمز الدعوة');
+      setError(res.error || 'رمز المرور غير صحيح');
     }
-  };
-
-  // Quick Admin Login
-  const handleAdminLogin = async () => {
-    setError('');
-    const res = await loginAsPeter();
-    if (res.success) {
-      router.push('/');
-    }
-  };
-
-  // Quick Roommate Login
-  const handleRoommateClick = (member) => {
-    loginAsMember(member);
-    router.push('/');
   };
 
   return (
-    <div className="max-w-md mx-auto py-8 px-2">
+    <div className="max-w-md mx-auto py-10 px-2">
       <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-xl">
         {/* Brand Header */}
         <div className="text-center mb-6">
@@ -95,9 +60,9 @@ function LoginContent() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             {apartment.name} • متابعة وتصفية مصاريف الشقة
           </p>
-          <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800">
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold border border-emerald-200 dark:border-emerald-800">
             <span>🔒</span>
-            <span>الدخول بدعوة فقط من المشرف بيتر صلاح</span>
+            <span>الدخول بدعوة وإضافة مسبقة من المشرف بيتر صلاح فقط</span>
           </div>
         </div>
 
@@ -106,7 +71,7 @@ function LoginContent() {
           <div className="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center">
             <p className="text-xs text-emerald-800 dark:text-emerald-300 font-bold mb-3">
               أنت مسجل حالياً كـ: <strong>{user.name}</strong>{' '}
-              {user.role === 'admin' && '👑 (المشرف)'}
+              {user.role === 'admin' ? '👑 (المشرف)' : '👤 (ساكن)'}
             </p>
             <div className="flex justify-center gap-2">
               <button
@@ -144,178 +109,51 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => {
-              setActiveTab('login');
+              setActiveTab('member');
               setError('');
             }}
             className={`py-2.5 rounded-xl transition-all ${
-              activeTab === 'login'
+              activeTab === 'member'
                 ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
             }`}
           >
-            تسجيل الدخول
+            دخول الساكن
           </button>
           <button
             type="button"
             onClick={() => {
-              setActiveTab('invite');
+              setActiveTab('admin');
               setError('');
             }}
             className={`py-2.5 rounded-xl transition-all ${
-              activeTab === 'invite'
+              activeTab === 'admin'
                 ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
             }`}
           >
-            انضمام برمز الدعوة
+            دخول المشرف (بيتر)
           </button>
         </div>
 
-        {/* TAB 1: FAST LOGIN */}
-        {activeTab === 'login' && (
-          <div className="space-y-5">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  رقم الهاتف أو البريد الإلكتروني
-                </label>
-                <input
-                  type="text"
-                  required
-                  dir="ltr"
-                  placeholder="01XXXXXXXXX أو name@gmail.com"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
-              </button>
-            </form>
-
-            {/* Quick Member Selection (Roommates already added by Peter) */}
-            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-              <span className="text-[11px] font-bold text-zinc-400 block mb-2.5 text-center">
-                أو اختر اسمك المسجل بالسكن للدخول السريع:
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {members
-                  .filter((m) => m.role !== 'admin')
-                  .map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => handleRoommateClick(m)}
-                      className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-right flex items-center gap-2"
-                    >
-                      <span className={`w-3 h-3 rounded-full ${m.avatar_color || 'bg-blue-500'}`} />
-                      <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 truncate">
-                        {m.name}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            {/* Admin Dedicated Button */}
-            <div className="pt-3">
-              <button
-                type="button"
-                onClick={handleAdminLogin}
-                className="w-full py-2.5 border-2 border-dashed border-emerald-400/60 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>👑</span>
-                <span>دخول المشرف: بيتر صلاح</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: INVITE CODE JOIN */}
-        {activeTab === 'invite' && (
-          <form onSubmit={handleJoinInvite} className="space-y-4">
+        {/* TAB 1: ROOMMATE PHONE LOGIN */}
+        {activeTab === 'member' && (
+          <form onSubmit={handleMemberLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                رمز دعوة السكن *
-              </label>
-              <input
-                type="text"
-                required
-                dir="ltr"
-                placeholder="مثال: PETER2026"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                className="w-full px-3.5 py-2.5 text-xs font-mono font-bold tracking-widest rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase"
-              />
-              <span className="text-[10px] text-zinc-400 mt-1 block">
-                اطلب رمز الدعوة من المشرف بيتر صلاح
-              </span>
-            </div>
-
-            {/* Option to link to existing member name if already listed */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                هل اسمك مسجل بالفعل في قائمة السكن؟
-              </label>
-              <select
-                value={selectedMemberToClaim}
-                onChange={(e) => {
-                  setSelectedMemberToClaim(e.target.value);
-                  if (e.target.value) {
-                    const found = members.find((m) => m.id === e.target.value);
-                    if (found) setNewName(found.name);
-                  }
-                }}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="">-- أنا ساكن جديد تماماً --</option>
-                {members
-                  .filter((m) => m.role !== 'admin')
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      نعم، أنا {m.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {!selectedMemberToClaim && (
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  اسمك بالكامل *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: يوسف حسام"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                رقم هاتفك *
+                رقم هاتفك المسجل *
               </label>
               <input
                 type="tel"
                 required
                 dir="ltr"
                 placeholder="01XXXXXXXXX"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs font-mono font-bold tracking-wider rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-[10px] text-zinc-400 mt-1 block">
-                سيُستخدم لتسجيل دخولك وتلقي إشعارات الحسابات
+              <span className="text-[11px] text-zinc-400 mt-1.5 block leading-relaxed">
+                ادخل رقم الهاتف الذي قام المشرف بيتر صلاح بإضافته لحسابك في السكن.
               </span>
             </div>
 
@@ -324,7 +162,39 @@ function LoginContent() {
               disabled={loading}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading ? 'جاري التحقق والانضمام...' : 'تأكيد الدعوة والدخول للسكن'}
+              {loading ? 'جاري التحقق من الرقم...' : 'تسجيل الدخول'}
+            </button>
+          </form>
+        )}
+
+        {/* TAB 2: PETER SALAH ADMIN LOGIN */}
+        {activeTab === 'admin' && (
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-[11px] text-amber-800 dark:text-amber-300 font-bold leading-relaxed">
+              👑 هذا القسم مخصص لبيتر صلاح فقط لإدارة ومتابعة السكن وإضافة الساكنين الجدد.
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                رمز مرور المشرف (PIN) *
+              </label>
+              <input
+                type="password"
+                required
+                dir="ltr"
+                placeholder="••••"
+                value={adminPin}
+                onChange={(e) => setAdminPin(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs font-mono font-bold tracking-widest rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-black text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? 'جاري التحقق...' : 'دخول المشرف'}
             </button>
           </form>
         )}
